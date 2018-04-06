@@ -15,10 +15,6 @@
             "homepage": "https://dbkg.de"
         }
     ],
-    "support": {
-        "issues": "",
-        "source": ""
-    },
     "require": {
         "flarum/core": "^0.1.0-beta.7"
     },
