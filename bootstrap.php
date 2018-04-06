@@ -6,5 +6,5 @@
 namespace tw88\sso;
 
 return function () {
-    echo "hi";
+    echo "hi!";
 };
