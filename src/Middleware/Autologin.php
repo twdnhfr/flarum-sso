@@ -1,12 +1,14 @@
 <?php
 namespace tw88\sso\Middleware;
 
+use Dotenv\Dotenv;
 use Flarum\Foundation\Application;
+use Flarum\Http\AccessToken;
+use Flarum\Http\SessionAuthenticator;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use tw88\sso\SSO;
-use Zend\Diactoros\Response\RedirectResponse;
 use Zend\Stratigility\MiddlewareInterface;
 
 class Autologin implements MiddlewareInterface
@@ -22,13 +24,32 @@ class Autologin implements MiddlewareInterface
     protected $settings;
 
     /**
+     * @var SessionAuthenticator
+     */
+    protected $authenticator;
+
+    /**
+     * @var Sso Broker
+     */
+    protected $sso;
+
+    protected $dotenv;
+
+    /**
      * @param Application $app
      * @param SettingsRepositoryInterface $settings
      */
-    public function __construct(Application $app, SettingsRepositoryInterface $settings)
+    public function __construct(Application $app, SettingsRepositoryInterface $settings, SessionAuthenticator $authenticator)
     {
-        $this->app      = $app;
-        $this->settings = $settings;
+        $this->app           = $app;
+        $this->settings      = $settings;
+        $this->authenticator = $authenticator;
+
+        $this->dotenv = new Dotenv($_SERVER['DOCUMENT_ROOT']);
+        $this->dotenv->load();
+        $this->dotenv->required(['SSO_URL', 'SSO_BROKER', 'SSO_SECRET']);
+
+        $this->sso = new SSO(getenv('SSO_URL'), getenv('SSO_BROKER'), getenv('SSO_SECRET'));
     }
 
     /**
@@ -39,67 +60,29 @@ class Autologin implements MiddlewareInterface
         do {
             // Check if a guest.
             $actor = $request->getAttribute('actor');
-            if (!$actor->isGuest()) {
+            if ($actor->isGuest()) {
+
+                $user = $this->sso->getUserInfo();
+
+                if (is_array($user)) {
+                    $session = $request->getAttribute('session');
+                    $this->authenticator->logIn($session, 1);
+
+                    // Generate remember me token (3600 is the time Flarum uses).
+                    $token = AccessToken::generate(1, 3600);
+                    $token->save();
+
+                    if ($this->events && $token && $user) {
+                        // Trigger the login event.
+                        $this->events->fire(new UserLoggedIn($user, $token));
+
+                        // Return the redirect response.
+                        return $response;
+                    }
+                }
+
                 break;
             }
-
-            // Check for the global cookie setting.
-            $authSettings = SSO::settingsAuth($this->settings, false);
-            if (!$authSettings) {
-                break;
-            }
-
-            // Check if the cookie is configured.
-            $globalCookie = $authSettings['global_cookie'];
-            if (!$globalCookie) {
-                break;
-            }
-
-            // Check if that cookie is set.
-            $cookies = $request->getCookieParams();
-            if (!isset($cookies[$globalCookie])) {
-                break;
-            }
-
-            // Get current request path.
-            // And URL hash is unfortunately unavailable.
-            // Such data will be discarded on auto-login.
-            $requestUri  = $request->getUri();
-            $requestPath = $requestUri->getPath();
-
-            // Ignore if the controller path, avoid infinite redirect.
-            if (strpos($requestPath, SSO::CONTROLLER_PATH) === 0) {
-                break;
-            }
-
-            // Get any query parameters.
-            $query = $requestUri->getQuery();
-
-            // Create the redirect path, preserve ? even if no query.
-            $params = $request->getQueryParams();
-
-            $redirect = $requestPath . (
-                $query ?
-                '?' . $query :
-                (
-                    isset($_SERVER['REQUEST_URI']) &&
-                    strpos($_SERVER['REQUEST_URI'], '?') !== false ?
-                    '?' : ''
-                )
-            );
-
-            // Create the login path.
-            $loginPath = rtrim($this->app->url(), '/') .
-            SSO::CONTROLLER_PATH . '/login';
-
-            // Create the redirect target, include return redirect parameters.
-            $target = SSO::addParams(
-                $loginPath,
-                ['redirect' => $redirect]
-            );
-
-            // Take over the response, redirect to login URL.
-            return new RedirectResponse($target);
 
         } while (false);
 
