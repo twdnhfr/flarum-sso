@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "content-hash": "c1d11f28cc92fab98d530f314d98af21",
+    "content-hash": "b8ae1b9cd2fe67e972c55f5c08e506f9",
     "packages": [
         {
             "name": "components/font-awesome",
@@ -3185,16 +3185,16 @@
         },
         {
             "name": "tw88/sso",
-            "version": "1",
+            "version": "2.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/tw88/sso.git",
-                "reference": "32be70a1ef3fe5b7dc6971b34e4a508b5e51042d"
+                "reference": "746323f3087af5a06769f7c207ab4ed5124a14bb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/tw88/sso/zipball/32be70a1ef3fe5b7dc6971b34e4a508b5e51042d",
-                "reference": "32be70a1ef3fe5b7dc6971b34e4a508b5e51042d",
+                "url": "https://api.github.com/repos/tw88/sso/zipball/746323f3087af5a06769f7c207ab4ed5124a14bb",
+                "reference": "746323f3087af5a06769f7c207ab4ed5124a14bb",
                 "shasum": ""
             },
             "require": {
@@ -3222,7 +3222,7 @@
                 "SSO",
                 "auth"
             ],
-            "time": "2018-04-06T12:37:56+00:00"
+            "time": "2018-04-09T11:54:14+00:00"
         },
         {
             "name": "zendframework/zend-diactoros",
