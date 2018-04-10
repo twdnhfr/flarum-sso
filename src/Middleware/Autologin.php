@@ -3,7 +3,6 @@ namespace tw88\sso\Middleware;
 
 use Dotenv\Dotenv;
 use Flarum\Foundation\Application;
-use Flarum\Http\AccessToken;
 use Flarum\Http\SessionAuthenticator;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -60,28 +59,20 @@ class Autologin implements MiddlewareInterface
         do {
             // Check if a guest.
             $actor = $request->getAttribute('actor');
-            if ($actor->isGuest()) {
 
-                $user = $this->sso->getUserInfo();
-
-                if (is_array($user)) {
-                    $session = $request->getAttribute('session');
-                    $this->authenticator->logIn($session, 1);
-
-                    // Generate remember me token (3600 is the time Flarum uses).
-                    $token = AccessToken::generate(1, 3600);
-                    $token->save();
-
-                    if ($this->events && $token && $user) {
-                        // Trigger the login event.
-                        $this->events->fire(new UserLoggedIn($user, $token));
-
-                        // Return the redirect response.
-                        return $response;
-                    }
-                }
-
+            if (!$actor->isGuest()) {
                 break;
+            }
+
+            $user = $this->sso->getUserInfo();
+
+            if (is_array($user)) {
+
+                $session = $request->getAttribute('session');
+                $this->authenticator->logIn($session, 1);
+
+                header('Location: /');
+                exit;
             }
 
         } while (false);
