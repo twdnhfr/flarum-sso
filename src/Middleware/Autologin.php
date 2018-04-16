@@ -2,6 +2,7 @@
 namespace tw88\sso\Middleware;
 
 use Dotenv\Dotenv;
+use Flarum\Core\User;
 use Flarum\Foundation\Application;
 use Flarum\Http\SessionAuthenticator;
 use Flarum\Settings\SettingsRepositoryInterface;
@@ -58,18 +59,22 @@ class Autologin implements MiddlewareInterface
     {
         do {
             // Check if a guest.
-            $actor = $request->getAttribute('actor');
+            $actor   = $request->getAttribute('actor');
+            $user    = $this->sso->getUserInfo();
+            $session = $request->getAttribute('session');
 
-            if (!$actor->isGuest()) {
-                break;
-            }
+            if ($actor->isGuest()) {
+                if (is_array($user)) {
 
-            $user = $this->sso->getUserInfo();
+                    $dbuser = User::where('uniqid', $user['uniqid'])->first();
 
-            if (is_array($user)) {
+                    $this->authenticator->logIn($session, $dbuser->id);
 
-                $session = $request->getAttribute('session');
-                $this->authenticator->logIn($session, 1);
+                    header('Location: /');
+                    exit;
+                }
+            } elseif ($actor->isGuest() == false && null == $user) {
+                $this->authenticator->logOut($session);
 
                 header('Location: /');
                 exit;
