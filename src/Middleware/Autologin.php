@@ -6,6 +6,7 @@ use Flarum\Core\User;
 use Flarum\Foundation\Application;
 use Flarum\Http\SessionAuthenticator;
 use Flarum\Settings\SettingsRepositoryInterface;
+use Flarum\Tags\Tag;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use tw88\sso\SSO;
@@ -66,9 +67,22 @@ class Autologin implements MiddlewareInterface
             if ($actor->isGuest()) {
                 if (is_array($user)) {
 
-                    $dbuser = User::where('uniqid', $user['uniqid'])->first();
+                    $klinikKuerzel = strtolower($user['fall']['klinik']['kuerzel']);
+                    $dbuser        = User::where('uniqid', $user['uniqid'])->first();
+
+                    if (null == $dbuser) {
+                        // Find User via Email if there is no matching UUID
+                        $dbuser = User::where('email', $user['email'])->first();
+                    }
+
+                    $baseTag = Tag::where('slug', 'like', "%$klinikKuerzel%")->first();
 
                     $this->authenticator->logIn($session, $dbuser->id);
+
+                    if ($baseTag) {
+                        header('Location: /t/' . $baseTag->slug);
+                        exit;
+                    }
 
                     header('Location: /');
                     exit;
