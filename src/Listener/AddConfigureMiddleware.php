@@ -18,15 +18,13 @@ class AddConfigureMiddleware
      * @var Application
      */
     protected $app;
-    protected $authenticator;
 
     /**
      * @param Application $app
      */
-    public function __construct(Application $app, SessionAuthenticator $authenticator)
+    public function __construct(Application $app)
     {
         $this->app = $app;
-        $this->authenticator = $authenticator;
     }
 
     /**
@@ -56,8 +54,6 @@ class AddConfigureMiddleware
             }
 
             return true;
-
-            // $this->authenticator->logIn($event->user->session, $dbuser->id);
         }
     }
 
