@@ -1,16 +1,17 @@
 <?php
+
 namespace tw88\sso\Middleware;
 
+use tw88\sso\SSO;
 use Dotenv\Dotenv;
+use Flarum\Tags\Tag;
 use Flarum\Core\User;
 use Flarum\Foundation\Application;
 use Flarum\Http\SessionAuthenticator;
+use Zend\Stratigility\MiddlewareInterface;
 use Flarum\Settings\SettingsRepositoryInterface;
-use Flarum\Tags\Tag;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use tw88\sso\SSO;
-use Zend\Stratigility\MiddlewareInterface;
 
 class Autologin implements MiddlewareInterface
 {
@@ -66,7 +67,6 @@ class Autologin implements MiddlewareInterface
 
             if ($actor->isGuest()) {
                 if (is_array($user)) {
-
                     $klinikKuerzel = strtolower($user['fall']['klinik']['kuerzel']);
                     $dbuser        = User::where('uniqid', $user['uniqid'])->first();
 
@@ -93,7 +93,6 @@ class Autologin implements MiddlewareInterface
                 header('Location: /');
                 exit;
             }
-
         } while (false);
 
         return $out ? $out($request, $response) : $response;
