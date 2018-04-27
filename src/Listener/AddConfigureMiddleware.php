@@ -4,56 +4,39 @@ namespace tw88\sso\Listener;
 
 use tw88\sso\SSO;
 use Dotenv\Dotenv;
-use Flarum\Core\User;
+use tw88\sso\Middleware\Login;
 use Flarum\Event\UserLoggedOut;
 use Illuminate\Events\Dispatcher;
+use tw88\flarumsso\SSOController;
 use Flarum\Foundation\Application;
 use tw88\sso\Middleware\Autologin;
-use Flarum\Event\CheckUserPassword;
 use Flarum\Event\ConfigureMiddleware;
+use Flarum\Event\ConfigureForumRoutes;
+use Flarum\Core\Validator\UserValidator;
 
-class AddConfigureMiddleware
+class AddConfigureMiddleware extends UserValidator
 {
-    /**
-     * @var Application
-     */
     protected $app;
 
-    /**
-     * @param Application $app
-     */
     public function __construct(Application $app)
     {
         $this->app = $app;
     }
 
-    /**
-     * @param Dispatcher $events
-     */
     public function subscribe(Dispatcher $events)
     {
-        $events->listen(CheckUserPassword::class, [$this, 'whenCheckUserPassword']);
         $events->listen(ConfigureMiddleware::class, [$this, 'whenConfigureMiddleware']);
         $events->listen(UserLoggedOut::class, [$this, 'whenUserLoggedOut']);
     }
 
-    public function whenCheckUserPassword(CheckUserPassword $event)
+    public function configureForumRoutes(ConfigureForumRoutes $event)
     {
-        $sso = new SSO(getenv('SSO_URL'), getenv('SSO_BROKER'), getenv('SSO_SECRET'));
+        $actions = [
+            'auth.sso.login' => '/login',
+        ];
 
-        $sso->login($event->user->email, $event->password);
-
-        $user    = $sso->getUserInfo();
-
-        if (is_array($user)) {
-            $dbuser = User::where('uniqid', $user['uniqid'])->first();
-
-            if (null == $dbuser) {
-                // Find User via Email if there is no matching UUID
-                $dbuser = User::where('email', $user['email'])->first();
-            }
-
-            return true;
+        foreach ($actions as $k => $v) {
+            $event->post($v, $k, SSOController::class);
         }
     }
 
@@ -62,6 +45,7 @@ class AddConfigureMiddleware
      */
     public function whenConfigureMiddleware(ConfigureMiddleware $event)
     {
+        $event->pipe->pipe($event->path, $this->app->make(Login::class));
         $event->pipe->pipe($event->path, $this->app->make(Autologin::class));
     }
 
