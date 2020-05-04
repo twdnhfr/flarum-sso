@@ -4,14 +4,15 @@ namespace tw88\sso\Middleware;
 
 use tw88\sso\SSO;
 use Dotenv\Dotenv;
-use Flarum\Core\User;
+use Flarum\User\User;
 use Flarum\Foundation\Application;
 use Flarum\Http\SessionAuthenticator;
-use Zend\Stratigility\MiddlewareInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Zend\Diactoros\Response\EmptyResponse;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
 use Flarum\Settings\SettingsRepositoryInterface;
-use Psr\Http\Message\ResponseInterface as Response;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Psr\Http\Message\ServerRequestInterface as Request;
 
 class Login implements MiddlewareInterface
 {
@@ -34,13 +35,21 @@ class Login implements MiddlewareInterface
         $this->sso = new SSO(getenv('SSO_URL'), getenv('SSO_BROKER'), getenv('SSO_SECRET'));
     }
 
-    public function __invoke(Request $request, Response $response, callable $out = null)
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         if ($request->getUri()->getPath() === '/login') {
             $credentials = $request->getParsedBody();
-            $session = $request->getAttribute('session');
+            $session     = $request->getAttribute('session');
 
-            $this->sso->login($credentials['identification'], $credentials['password']);
+            try {
+                $this->sso->login($credentials['identification'], $credentials['password']);
+            } catch (\Exception $ex) {
+                if (in_array($ex->getMessage(), ['Invalid credentials', 'user not found'])) {
+                    return new EmptyResponse(401);
+                }
+
+                throw $ex;
+            }
 
             $ssoUser = $this->sso->getUserInfo();
 
@@ -49,32 +58,26 @@ class Login implements MiddlewareInterface
 
                 $user = $uniqUser ? $uniqUser : User::where('email', $ssoUser['email'])->first();
 
-                if ($user) {
-                    if (is_null($user->uniqid)) {
-                        $user->uniqid = $ssoUser['uniqid'];
-                        $user->save();
-                    }
-
-                    $user = User::where('uniqid', $ssoUser['uniqid'])->first();
-
-                    $this->authenticator->logIn($session, $user);
-                }
-
-                if (! $user) {
+                if (!$user) {
                     do {
                         $randomUserName = 'Nutzer' . rand(1000, 99999);
                     } while (User::where(['username' => $randomUserName])->first());
 
-                    $newUser = User::register($randomUserName, $ssoUser['email'], '');
-                    $newUser->activate();
-                    $newUser->uniqid = $ssoUser['uniqid'];
-                    $newUser->save();
+                    $user = User::register($randomUserName, $ssoUser['email'], '');
+                    $user->activate();
                 }
 
-                return new RedirectResponse('/');
+                if (null === $user->uniqid) {
+                    $user->uniqid = $ssoUser['uniqid'];
+                    $user->save();
+                }
+
+                $this->authenticator->logIn($session, $user->id);
+
+                return new EmptyResponse(200);
             }
         }
 
-        return $out ? $out($request, $response) : $response;
+        return $handler->handle($request);
     }
 }

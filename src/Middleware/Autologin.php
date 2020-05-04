@@ -4,14 +4,15 @@ namespace tw88\sso\Middleware;
 
 use tw88\sso\SSO;
 use Dotenv\Dotenv;
-use Flarum\Tags\Tag;
-use Flarum\Core\User;
+use Flarum\User\User;
 use Flarum\Foundation\Application;
 use Flarum\Http\SessionAuthenticator;
-use Zend\Stratigility\MiddlewareInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+use Zend\Diactoros\Response\RedirectResponse;
 use Flarum\Settings\SettingsRepositoryInterface;
-use Psr\Http\Message\ResponseInterface as Response;
-use Psr\Http\Message\ServerRequestInterface as Request;
 
 class Autologin implements MiddlewareInterface
 {
@@ -57,44 +58,45 @@ class Autologin implements MiddlewareInterface
     /**
      * {@inheritdoc}
      */
-    public function __invoke(Request $request, Response $response, callable $out = null)
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        do {
-            // Check if a guest.
-            $actor   = $request->getAttribute('actor');
-            $user    = $this->sso->getUserInfo();
-            $session = $request->getAttribute('session');
+        // Check if a guest.
+        $actor   = $request->getAttribute('actor');
+        $user    = $this->sso->getUserInfo();
+        $session = $request->getAttribute('session');
 
-            if ($actor->isGuest()) {
-                if (is_array($user)) {
-                    $klinikKuerzel = strtolower($user['fall']['klinik']['kuerzel']);
-                    $dbuser        = User::where('uniqid', $user['uniqid'])->first();
+        if ($actor->isGuest()) {
+            $ssoUser = $this->sso->getUserInfo();
 
-                    if (null == $dbuser) {
-                        // Find User via Email if there is no matching UUID
-                        $dbuser = User::where('email', $user['email'])->first();
-                    }
+            if (is_array($ssoUser)) {
+                $uniqUser = User::where('uniqid', $ssoUser['uniqid'])->first();
 
-                    $baseTag = Tag::where('slug', 'like', "%$klinikKuerzel%")->first();
+                $user = $uniqUser ? $uniqUser : User::where('email', $ssoUser['email'])->first();
 
-                    $this->authenticator->logIn($session, $dbuser->id);
+                if (!$user) {
+                    do {
+                        $randomUserName = 'Nutzer' . rand(1000, 99999);
+                    } while (User::where(['username' => $randomUserName])->first());
 
-                    if ($baseTag) {
-                        header('Location: /t/' . $baseTag->slug);
-                        exit;
-                    }
-
-                    header('Location: /');
-                    exit;
+                    $user = User::register($randomUserName, $ssoUser['email'], '');
+                    $user->activate();
                 }
-            } elseif ($actor->isGuest() == false && null == $user) {
-                $this->authenticator->logOut($session);
 
-                header('Location: /');
-                exit;
+                if (null === $user->uniqid) {
+                    $user->uniqid = $ssoUser['uniqid'];
+                    $user->save();
+                }
+
+                $this->authenticator->logIn($session, $user->id);
+
+                return new RedirectResponse("/");
             }
-        } while (false);
+        } elseif ($actor->isGuest() == false && null == $user) {
+            $this->authenticator->logOut($session);
 
-        return $out ? $out($request, $response) : $response;
+            return new RedirectResponse('/');
+        }
+
+        return $handler->handle($request);
     }
 }
