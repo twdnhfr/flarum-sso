@@ -6,7 +6,7 @@ import LogInModal from "flarum/components/LogInModal";
 
 app.initializers.add('dbkg-sso', () => {
     // remove sign up link from the modal
-    LogInModal.prototype.footer = () => <div>SSO is enabled.</div>
+    LogInModal.prototype.footer = () => <div>Ihre Zugangsdaten entsprechen Ihren Zugangsdaten für "Mein Bereich".<br/>Falls Sie diese vergessen haben, können Sie <a style="font-weight: bold" href="https://meinbereich.dbkg.de">HIER</a> Ihr Passwort zurücksetzen.</div>
 
     // remove sign up button
     extend(HeaderSecondary.prototype, 'items', items => {
