@@ -59,8 +59,11 @@ class Login implements MiddlewareInterface
                 $user = $uniqUser ? $uniqUser : User::where('email', $ssoUser['email'])->first();
 
                 if (!$user) {
+                    $counter = 0;
+
                     do {
-                        $randomUserName = 'Nutzer' . rand(1000, 99999);
+                        $counter++;
+                        $randomUserName = $ssoUser['vorname'] . $counter;
                     } while (User::where(['username' => $randomUserName])->first());
 
                     $user = User::register($randomUserName, $ssoUser['email'], '');
