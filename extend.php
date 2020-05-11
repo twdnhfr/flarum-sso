@@ -10,5 +10,6 @@ return [
 
     function (Dispatcher $events) {
         $events->subscribe(Listener\AddConfigureMiddleware::class);
+        $events->subscribe(Listener\MailNotificator::class);
     },
 ];
