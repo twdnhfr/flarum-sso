@@ -4,6 +4,7 @@ namespace tw88\sso\Middleware;
 
 use tw88\sso\SSO;
 use Dotenv\Dotenv;
+use Flarum\Tags\Tag;
 use Flarum\User\User;
 use Flarum\Foundation\Application;
 use Flarum\Http\SessionAuthenticator;
@@ -48,7 +49,7 @@ class Autologin implements MiddlewareInterface
         $this->settings      = $settings;
         $this->authenticator = $authenticator;
 
-        $this->dotenv = new Dotenv($_SERVER['DOCUMENT_ROOT']);
+        $this->dotenv = new Dotenv($_SERVER['DOCUMENT_ROOT'] . '/..');
         $this->dotenv->load();
         $this->dotenv->required(['SSO_URL', 'SSO_BROKER', 'SSO_SECRET']);
 
@@ -66,35 +67,26 @@ class Autologin implements MiddlewareInterface
         $session = $request->getAttribute('session');
 
         if ($actor->isGuest()) {
-            $ssoUser = $this->sso->getUserInfo();
+            if (is_array($user)) {
+                $klinikKuerzel = strtolower($user['fall']['klinik']['kuerzel'] ?? '');
+                $dbuser        = User::where('uniqid', $user['uniqid'])->first();
 
-            if (is_array($ssoUser)) {
-                $uniqUser = User::where('uniqid', $ssoUser['uniqid'])->first();
-
-                $user = $uniqUser ? $uniqUser : User::where('email', $ssoUser['email'])->first();
-
-                if (!$user) {
-                    $counter = 0;
-
-                    do {
-                        $counter++;
-                        $randomUserName = $ssoUser['vorname'] . $counter;
-                    } while (User::where(['username' => $randomUserName])->first());
-
-                    $user = User::register($randomUserName, $ssoUser['email'], '');
-                    $user->activate();
+                if (null == $dbuser) {
+                    // Find User via Email if there is no matching UUID
+                    $dbuser = User::where('email', $user['email'])->first();
                 }
 
-                if (null === $user->uniqid) {
-                    $user->uniqid = $ssoUser['uniqid'];
-                    $user->save();
+                $baseTag = Tag::where('slug', 'like', "%$klinikKuerzel%")->first();
+
+                $this->authenticator->logIn($session, $dbuser->id);
+
+                if ($baseTag) {
+                    return new RedirectResponse('/t/' . $baseTag->slug);
                 }
 
-                $this->authenticator->logIn($session, $user->id);
-
-                return new RedirectResponse("/");
+                return new RedirectResponse('/');
             }
-        } elseif ($actor->isGuest() == false && null == $user) {
+        } elseif ($actor->isGuest() == false && null == $user && 'admin' !== $actor->username) {
             $this->authenticator->logOut($session);
 
             return new RedirectResponse('/');

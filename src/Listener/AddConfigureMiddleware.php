@@ -4,12 +4,12 @@ namespace tw88\sso\Listener;
 
 use tw88\sso\SSO;
 use Dotenv\Dotenv;
+use Flarum\User\UserValidator;
 use tw88\sso\Middleware\Login;
 use Illuminate\Events\Dispatcher;
 use Flarum\Foundation\Application;
 use tw88\sso\Middleware\Autologin;
 use Flarum\Event\ConfigureMiddleware;
-use Flarum\User\UserValidator;
 use Flarum\User\Event\LoggedOut as UserLoggedOut;
 
 class AddConfigureMiddleware extends UserValidator
@@ -32,8 +32,8 @@ class AddConfigureMiddleware extends UserValidator
      */
     public function whenConfigureMiddleware(ConfigureMiddleware $event)
     {
-       $event->pipe->pipe($this->app->make(Login::class));
-       $event->pipe->pipe($this->app->make(Autologin::class));
+        $event->pipe->pipe($this->app->make(Login::class));
+        $event->pipe->pipe($this->app->make(Autologin::class));
     }
 
     /**
@@ -41,11 +41,13 @@ class AddConfigureMiddleware extends UserValidator
      */
     public function whenUserLoggedOut(UserLoggedOut $event)
     {
-        $this->dotenv = new Dotenv($_SERVER['DOCUMENT_ROOT']);
-        if($event->user->uniqid === null) return; // users without an uniqid are flarum-only accounts like an admin account
+        if (null === $event->user->uniqid) {
+            return;
+        }
 
-        //return; // @todo mit tobias wiedenhöfer klären
+        // users without an uniqid are flarum-only accounts like an admin account
 
+        $this->dotenv = new Dotenv($_SERVER['DOCUMENT_ROOT'] . '/..');
         $this->dotenv->load();
         $this->dotenv->required(['SSO_URL', 'SSO_BROKER', 'SSO_SECRET']);
 
@@ -53,8 +55,8 @@ class AddConfigureMiddleware extends UserValidator
 
         try {
             $this->sso->logout();
-        } catch(\Exception $ex) {
-            if(!starts_with($ex->getMessage(), 'Expected application/json')) {
+        } catch (\Exception $ex) {
+            if (!starts_with($ex->getMessage(), 'Expected application/json')) {
                 throw $ex;
             }
         }

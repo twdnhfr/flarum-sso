@@ -4,7 +4,9 @@ namespace tw88\sso\Middleware;
 
 use tw88\sso\SSO;
 use Dotenv\Dotenv;
+use Flarum\Tags\Tag;
 use Flarum\User\User;
+use Flarum\Group\Group;
 use Flarum\Foundation\Application;
 use Flarum\Http\SessionAuthenticator;
 use Psr\Http\Message\ResponseInterface;
@@ -28,7 +30,7 @@ class Login implements MiddlewareInterface
         $this->settings      = $settings;
         $this->authenticator = $authenticator;
 
-        $this->dotenv = new Dotenv($_SERVER['DOCUMENT_ROOT']);
+        $this->dotenv = new Dotenv($_SERVER['DOCUMENT_ROOT'] . '/..');
         $this->dotenv->load();
         $this->dotenv->required(['SSO_URL', 'SSO_BROKER', 'SSO_SECRET']);
 
@@ -41,6 +43,10 @@ class Login implements MiddlewareInterface
             $credentials = $request->getParsedBody();
             $session     = $request->getAttribute('session');
 
+            if ('admin' === $credentials['identification']) {
+                return $handler->handle($request);
+            }
+
             try {
                 $this->sso->login($credentials['identification'], $credentials['password']);
             } catch (\Exception $ex) {
@@ -52,6 +58,31 @@ class Login implements MiddlewareInterface
             }
 
             $ssoUser = $this->sso->getUserInfo();
+
+            $klinikName = $ssoUser['fall']['klinik']['name'];
+
+            $group = Group::all()->where('name_singular', '=', "$klinikName-Pat")->first();
+
+            if (!$group) {
+                $group = Group::build("$klinikName-Pat", "$klinikName-Pats", null, null);
+                $group->save();
+            }
+
+            $moderatorGroup = Group::all()->where('name_singular', '=', "$klinikName-Mod")->first();
+
+            if (!$moderatorGroup) {
+                $moderatorGroup = Group::build("$klinikName-Mod", "$klinikName-Mods", null, null);
+                $moderatorGroup->save();
+            }
+
+            $tag = Tag::all()->where('name', '=', $klinikName)->first();
+
+            if (!$tag) {
+                $tag                    = Tag::build($klinikName, str_slug($klinikName), null, null, null, false);
+                $tag->position          = 1;
+                $tag->moderator_role_id = $moderatorGroup->id;
+                $tag->save();
+            }
 
             if (is_array($ssoUser)) {
                 $uniqUser = User::where('uniqid', $ssoUser['uniqid'])->first();
@@ -73,6 +104,7 @@ class Login implements MiddlewareInterface
                 if (null === $user->uniqid) {
                     $user->uniqid = $ssoUser['uniqid'];
                     $user->save();
+                    $user->groups()->attach($group->id);
                 }
 
                 $this->authenticator->logIn($session, $user->id);
