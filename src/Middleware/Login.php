@@ -86,8 +86,7 @@ class Login implements MiddlewareInterface
 
             if (is_array($ssoUser)) {
                 $uniqUser = User::where('uniqid', $ssoUser['uniqid'])->first();
-
-                $user = $uniqUser ? $uniqUser : User::where('email', $ssoUser['email'])->first();
+                $user     = $uniqUser ? $uniqUser : User::where('email', $ssoUser['email'])->first();
 
                 if (!$user) {
                     $counter = 0;
@@ -104,6 +103,17 @@ class Login implements MiddlewareInterface
                 if (null === $user->uniqid) {
                     $user->uniqid = $ssoUser['uniqid'];
                     $user->save();
+                    $user->groups()->attach($group->id);
+                }
+
+                $hasCorrectGroup = false;
+                foreach ($user->groups as $grp) {
+                    if ("$klinikName-Pat" == $grp->name_singular) {
+                        $hasCorrectGroup = true;
+                    }
+                }
+
+                if (!$hasCorrectGroup) {
                     $user->groups()->attach($group->id);
                 }
 
