@@ -59,6 +59,10 @@ class Login implements MiddlewareInterface
 
             $ssoUser = $this->sso->getUserInfo();
 
+            if (!array_key_exists('fall', $ssoUser)) {
+                return new EmptyResponse(401);
+            }
+
             $klinikName = $ssoUser['fall']['klinik']['name'];
 
             $group = Group::all()->where('name_singular', '=', "$klinikName-Pat")->first();
