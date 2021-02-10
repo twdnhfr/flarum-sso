@@ -63,14 +63,14 @@ class Login implements MiddlewareInterface
 
             $group = Group::all()->where('name_singular', '=', "$klinikName-Pat")->first();
 
-            if (!$group) {
+            if (!$group && "" != $klinikName) {
                 $group = Group::build("$klinikName-Pat", "$klinikName-Pats", null, null);
                 $group->save();
             }
 
             $moderatorGroup = Group::all()->where('name_singular', '=', "$klinikName-Mod")->first();
 
-            if (!$moderatorGroup) {
+            if (!$moderatorGroup && "" != $klinikName) {
                 $moderatorGroup = Group::build("$klinikName-Mod", "$klinikName-Mods", null, null);
                 $moderatorGroup->save();
             }
@@ -103,12 +103,18 @@ class Login implements MiddlewareInterface
                 if (null === $user->uniqid) {
                     $user->uniqid = $ssoUser['uniqid'];
                     $user->save();
-                    $user->groups()->attach($group->id);
                 }
 
                 $hasCorrectGroup = false;
+
                 foreach ($user->groups as $grp) {
-                    if ("$klinikName-Pat" == $grp->name_singular) {
+                    if (1 === $grp->id) {
+                        // Is Admin
+                        $hasCorrectGroup = true;
+                    } else if ("$klinikName-Mod" == $grp->name_singular) {
+                        // Is Moderator
+                        $hasCorrectGroup = true;
+                    } else if ("$klinikName-Pat" == $grp->name_singular) {
                         $hasCorrectGroup = true;
                     }
                 }
