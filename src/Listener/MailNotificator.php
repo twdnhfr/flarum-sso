@@ -58,6 +58,18 @@ class MailNotificator
 
             $moderatorGroup = Group::all()->where('id', '=', $tag->moderator_role_id)->first();
             foreach ($moderatorGroup->users as $user) {
+                if ("" == $user->email) {
+                    continue;
+                }
+
+                if (!filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+                    continue;
+                }
+
+                if (str_contains($user->email, 'test_mod_')) {
+                    continue;
+                }
+
                 if ($newDiscussion) {
                     if ($discussion->user_id === $user->id) {
                         continue;
