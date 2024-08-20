@@ -17,7 +17,7 @@
     ],
     "require": {
         "flarum/core": "*",
-        "tw88/sso": "^2.0",
+        "tw88/sso": "2.0.4",
         "vlucas/phpdotenv": "^5.0.0"
     },
       "autoload": {
